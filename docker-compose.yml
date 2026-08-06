@@ -1,0 +1,16 @@
+services:
+  quotation:
+    build: .
+    image: quotation-bot
+    container_name: quotation-bot
+    ports:
+      - "8766:8766"
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - .env
+    environment:
+      - PORT=8766
+      - DATA_DIR=/app/data
+      - NODE_ENV=production
+    restart: unless-stopped

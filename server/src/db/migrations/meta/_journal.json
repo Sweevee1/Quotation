@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1786009119668,
+      "tag": "0000_big_agent_brand",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1786020772575,
+      "tag": "0001_thankful_shockwave",
+      "breakpoints": true
+    }
+  ]
+}
