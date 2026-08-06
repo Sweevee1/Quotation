@@ -32,6 +32,18 @@ server's `dev` script (`tsx watch`) does *not* type-check.
 `dist/db/migrations` — if you add a schema change, run `npm run db:generate` and commit the generated SQL
 file, or production deployments will silently run without your new columns/tables.
 
+## Deployment
+
+Hosted at `github.com/Sweevee1/quotation` (public repo). `.github/workflows/docker.yml` builds and pushes
+the Docker image to `ghcr.io/sweevee1/quotation:latest` on every push to `main` — no manual publish step.
+The primary install target is Unraid (pull the GHCR image directly via the Docker tab); `README.md` has the
+field-by-field container setup. `docker compose` (this repo's `docker-compose.yml`) is the alternative for
+any other Docker host, building the image locally instead of pulling.
+
+The GHCR package's visibility is a GitHub-side setting independent of the repo's — it defaults to private
+even when the source repo is public, which silently breaks anonymous `docker pull` until someone flips it
+to public in the package's own Settings → Danger Zone.
+
 ## Architecture
 
 ### Twitch auth is two independent token flows

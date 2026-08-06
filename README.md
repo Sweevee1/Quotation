@@ -1,6 +1,6 @@
 # Quotation
 
-Self-hosted Twitch chat quote bot with a WebUI, replacing Streamlabs Chatbot's Quotes feature.
+Self-hosted Twitch chat quote bot with a WebUI, letting mods and viewers save and recall memorable chat moments.
 
 Commands: `!addquote <text>`, `!quote [id]`, `!editquote <id> <text>`, `!removequote <id>` (alias `!delquote`). Each quote captures the text, an attributed author, the game/category live at creation time, and a sequential ID — configurable per-command permissions, cooldowns, aliases, and response format live in the WebUI Settings page.
 
