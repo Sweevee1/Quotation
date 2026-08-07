@@ -325,6 +325,12 @@ export default function SettingsPage() {
                 WebUI at once deployed. Leave the port as <code>8766</code> unless you changed it in your
                 deployment config.
               </p>
+              <p className="hint" style={{ margin: 0 }}>
+                Twitch requires that server URL to be <strong>https</strong> — it won't accept plain http for
+                anything but literal localhost. If you're not behind a reverse proxy with a real certificate
+                (e.g. reaching this over a bare LAN IP), see the README's "HTTPS for Twitch OAuth without a
+                reverse proxy" section for a bundled self-signed option instead.
+              </p>
             </div>
             {twitchError && <p className="error-text">{twitchError}</p>}
             <div className="row">

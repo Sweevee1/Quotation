@@ -17,9 +17,22 @@ Whichever way you install it, you'll need to do these two steps once, first:
 
 If Twitch ever reports `redirect_mismatch`, it redirects the error to whatever URI *is* registered — check where the browser lands to see the mismatch, then fix either the console entry or `PUBLIC_URL`.
 
+Twitch requires that production redirect URI to be `https://` — it rejects `http://` outright for anything but literal `localhost`. If you're not putting this behind a reverse proxy (e.g. a typical Unraid install reached directly by LAN IP), see **HTTPS for Twitch OAuth without a reverse proxy** below before registering the URL.
+
 ## 2. Create a dedicated bot account
 
 Use a second Twitch account (not your main channel) so chat messages are clearly the bot. **Make that bot account a Moderator on your channel** — this is required for the live Follower-permission check to work (`moderator:read:followers`).
+
+## HTTPS for Twitch OAuth without a reverse proxy
+
+Twitch's OAuth redirect URI must be `https://` for anything but literal `localhost` — there's no way around this on Twitch's end. If you already have a reverse-proxy domain with a real certificate in front of this app, just set `PUBLIC_URL` to that and register its `https://.../twitch/callback` — you don't need anything below.
+
+If you don't (e.g. you reach this app directly at `http://<unraid-ip>:8766`, the common case), set the `TLS_PORT` variable (e.g. `8767`) — the server then also listens on that port with a self-signed certificate it generates and persists to `DATA_DIR` on first boot, solely so the OAuth callback can be HTTPS. Then:
+
+1. Expose that port too: on Unraid, add another **Port** mapping, Container `8767` → Host `8767` (or any free port); in Docker Compose, uncomment the matching lines in `docker-compose.yml`.
+2. Set `PUBLIC_URL=https://<your-server-address>:8767`.
+3. Register `https://<your-server-address>:8767/twitch/callback` as the Twitch redirect URI (not `8766` — that port stays plain HTTP).
+4. The first time you click **Connect with Twitch**, the popup will briefly hit that HTTPS port and your browser will show an untrusted-certificate warning (expected — it's self-signed) — click through it (Chrome: **Advanced → Proceed**). You only need to do this once; the cert is reused after that. You keep using `http://<your-server-address>:8766` for the WebUI itself day-to-day.
 
 ## Installing on Unraid
 
@@ -39,8 +52,9 @@ A pre-built image is published to GHCR on every push: `ghcr.io/sweevee1/quotatio
    |---|---|
    | `WEBUI_PASSWORD` | any password — only seeds the WebUI login on first run, change it from Settings afterward |
    | `SESSION_SECRET` | any long random string (e.g. generate one with `openssl rand -hex 32`) |
-   | `PUBLIC_URL` | your externally-reachable `https://` address, e.g. `https://quotation.yourdomain.com`, if you're putting this behind a reverse proxy — otherwise omit |
-4. Apply, then open `http://<your-unraid-ip>:8766`, log in with `WEBUI_PASSWORD`, and in Settings enter your channel name plus the Twitch Client ID/Secret from step 1, then click **Connect with Twitch**.
+   | `PUBLIC_URL` | your externally-reachable `https://` address if you're putting this behind a reverse proxy, e.g. `https://quotation.yourdomain.com` — otherwise, see **HTTPS for Twitch OAuth without a reverse proxy** above |
+   | `TLS_PORT` | only if you followed the section above without a reverse proxy, e.g. `8767` — otherwise omit |
+4. Apply, then open `http://<your-unraid-ip>:8766`, log in with `WEBUI_PASSWORD`, enter your channel name plus the Twitch Client ID/Secret from step 1 in Settings and save, then go to the Dashboard and click **Connect with Twitch**.
 
 The SQLite database lives at `/mnt/user/appdata/quotation/quotation.db` on the host, so it survives container updates/recreation.
 
@@ -70,7 +84,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173, log in with `WEBUI_PASSWORD`, then in Settings enter your channel name, Twitch Client ID/Secret, and click **Connect with Twitch** to authorize the bot account.
+Open http://localhost:5173, log in with `WEBUI_PASSWORD`, enter your channel name and Twitch Client ID/Secret in Settings, then go to the Dashboard and click **Connect with Twitch** to authorize the bot account.
 
 ## Permission tiers
 
