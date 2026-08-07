@@ -28,6 +28,8 @@ COPY --from=build /app/shared/dist shared/dist
 COPY --from=build /app/server/dist server/dist
 COPY --from=build /app/web/dist web/dist
 
-EXPOSE 8766
+# 8766: main HTTP port. 8767: optional bundled self-signed HTTPS listener for Twitch OAuth
+# on deployments with no reverse-proxy TLS termination — only used if TLS_PORT is set.
+EXPOSE 8766 8767
 VOLUME /app/data
 CMD ["node", "server/dist/index.js"]

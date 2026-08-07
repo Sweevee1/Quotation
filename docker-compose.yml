@@ -5,6 +5,9 @@ services:
     container_name: quotation-bot
     ports:
       - "8766:8766"
+      # Uncomment along with TLS_PORT below if you have no reverse-proxy TLS termination and
+      # need Twitch OAuth to work — see README's "HTTPS for Twitch OAuth" section.
+      # - "8767:8767"
     volumes:
       - ./data:/app/data
     env_file:
@@ -13,4 +16,6 @@ services:
       - PORT=8766
       - DATA_DIR=/app/data
       - NODE_ENV=production
+      # - TLS_PORT=8767
+      # - PUBLIC_URL=https://your-server-address:8767
     restart: unless-stopped
