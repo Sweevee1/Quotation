@@ -51,10 +51,25 @@ to public in the package's own Settings → Danger Zone.
   no user interaction, used for public Helix lookups: current game, broadcaster ID, live status,
   profile pictures. Cached in memory, refreshed on expiry.
 - **User (bot) access token** (Authorization Code flow, `server/src/twitch/oauth.ts`) — obtained once via
-  the WebUI's "Connect with Twitch" popup (`server/src/routes/twitchOAuth.ts`, mirrors the redirect-URI
-  auto-detection pattern documented in the project's setup notes), persisted in the `settings` table,
-  auto-refreshed. Used for tmi.js chat login and for `moderator:read:followers` (the bot account must be a
-  channel moderator for the Follower permission tier to work).
+  the WebUI's "Connect with Twitch" popup (button lives on the Dashboard, not Settings —
+  `server/src/routes/twitchOAuth.ts`, mirrors the redirect-URI auto-detection pattern documented in the
+  project's setup notes), persisted in the `settings` table, auto-refreshed. Used for tmi.js chat login and
+  for `moderator:read:followers` (the bot account must be a channel moderator for the Follower permission
+  tier to work).
+
+### Twitch OAuth requires real HTTPS — `TLS_PORT` bundles a self-signed listener for it
+Twitch rejects `http://` redirect URIs outright at app-registration time for anything but literal
+`localhost` (confirmed live in the Twitch Developer Console: "Redirect URIs must use HTTPS protocol").
+Self-hosted deployments with no TLS-terminating reverse proxy — the common case: reached directly by LAN
+IP, e.g. most Unraid installs — have no other way to satisfy that. Setting the optional `TLS_PORT` env var
+(`server/src/index.ts`) starts a second `https.createServer` on the *same* Express `app` used for the main
+`PORT` listener, using a self-signed cert `server/src/tls/selfSignedCert.ts` generates once (SAN includes
+`PUBLIC_URL`'s hostname if set, plus `localhost`/`127.0.0.1`) and persists to `DATA_DIR` so restarts don't
+force a fresh browser click-through. `PUBLIC_URL` must then point at that `https://host:TLS_PORT` address —
+`getRedirectUri()` in `twitchOAuth.ts` uses `PUBLIC_URL` verbatim over the incoming request's own
+protocol/host specifically so the OAuth redirect URI can point at the TLS port while the WebUI itself keeps
+being served over plain HTTP on the main `PORT` day-to-day. The browser shows one untrusted-certificate
+warning to click through per cert (not per session) since it's self-signed, not CA-issued.
 
 ### The bot has no manual start/stop
 `server/src/twitch/chatClient.ts` auto-connects whenever authorized + a channel is configured — triggered
@@ -93,6 +108,18 @@ Settings are a key-value table (`services/settingsService.ts` `getSetting`/`setS
 columns — everything from Twitch tokens to the WebUI password hash lives there. Per-command config
 (permission, cooldowns, aliases, response template) is its own table, seeded with defaults in
 `ensureBootstrap()` on first boot.
+
+### WebUI session cookie's `secure` flag is auto-detected, never hardcoded
+`server/src/auth/session.ts` deliberately omits `cookie-session`'s `secure` option. The underlying `cookies`
+package then auto-detects it per-request from `req.protocol` (which respects `X-Forwarded-Proto`, since
+`app.ts` sets `trust proxy`) — so it's `secure` when reached over real or self-signed HTTPS and not-secure
+over plain HTTP, correct in all three deployment shapes (direct HTTP, the bundled `TLS_PORT` listener, and a
+reverse proxy). A previous version hardcoded `secure: NODE_ENV === "production"`, which broke every
+plain-HTTP deployment (the common self-hosted case, e.g. Unraid reached directly by LAN IP): `cookies.set()`
+throws `"Cannot send secure cookie over unencrypted connection"` when `secure:true` is forced but the
+connection isn't HTTPS, and `cookie-session` silently swallows that throw in its `onHeaders` callback — so
+the `Set-Cookie` header was just never sent, and every request looked unauthenticated with no visible error
+anywhere (not in the response, not in a thrown exception — only as repeated 401s).
 
 ### Backups
 `services/backupService.ts` snapshots the full `quotes` table as a JSON blob into `quote_backups`, capped
