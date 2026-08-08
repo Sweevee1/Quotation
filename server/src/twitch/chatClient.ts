@@ -15,6 +15,25 @@ let lastError: string | null = null;
 let desiredConnected = false;
 
 const RECONNECT_DELAY_MS = 5000;
+const CONNECT_TIMEOUT_MS = 20000;
+
+const CONNECT_TIMEOUT_ERROR = "Connection attempt to Twitch IRC timed out";
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
+}
 
 export async function getBotStatus(): Promise<BotStatus> {
   const [channel, botLogin, quoteCount] = await Promise.all([
@@ -101,11 +120,32 @@ export async function connectBot(): Promise<void> {
       }).catch((err) => logger.error({ err }, "Failed to handle chat message"));
     });
 
-    await thisClient.connect();
+    await withTimeout(thisClient.connect(), CONNECT_TIMEOUT_MS, CONNECT_TIMEOUT_ERROR);
   } catch (err) {
-    logger.error({ err }, "Failed to connect Twitch chat bot");
-    setStatus("error", err instanceof Error ? err.message : "Unknown connection error");
-    desiredConnected = false;
+    // tmi.js's connect() promise can hang indefinitely on a stalled IRC handshake (e.g. a
+    // network blip) without ever resolving or rejecting — withTimeout is what turns that into
+    // a catchable error here. Treat it like an unexpected drop (retry) rather than a config
+    // error (give up), since the underlying cause is transient, not a bad token/channel.
+    const timedOut = err instanceof Error && err.message === CONNECT_TIMEOUT_ERROR;
+
+    if (client) {
+      await client.disconnect().catch(() => undefined);
+      client = null;
+    }
+
+    if (timedOut && desiredConnected) {
+      logger.warn({ err }, "Twitch IRC connect attempt timed out; retrying");
+      setStatus("connecting", CONNECT_TIMEOUT_ERROR);
+      setTimeout(() => {
+        if (desiredConnected && !client) {
+          connectBot().catch((e) => logger.error({ err: e }, "Reconnect failed"));
+        }
+      }, RECONNECT_DELAY_MS);
+    } else {
+      logger.error({ err }, "Failed to connect Twitch chat bot");
+      setStatus("error", err instanceof Error ? err.message : "Unknown connection error");
+      desiredConnected = false;
+    }
   }
 }
 
