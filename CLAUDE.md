@@ -81,6 +81,15 @@ together caused a connect/disconnect loop. Each tmi.js client instance's event h
 event can't clobber a newer working connection. There is no user-facing connect/disconnect control; the
 Dashboard only displays status.
 
+**`connectBot()`'s IRC handshake is wrapped in a 20s timeout** (`CONNECT_TIMEOUT_MS`, `withTimeout()` in
+`chatClient.ts`) because tmi.js's `connect()` promise can hang indefinitely on a stalled handshake — it
+neither resolves nor rejects, so without a timeout the status sits at `"connecting"` forever with no retry
+and no error, indistinguishable from a slow-but-working connection (this happened live: the container had
+to be restarted to clear it). A timeout is treated as a transient drop — the stale client is torn down and
+a reconnect is scheduled after `RECONNECT_DELAY_MS`, same as an unexpected mid-session disconnect — whereas
+any other `connect()` rejection (bad token, unconfigured channel) still goes to `"error"` and gives up
+(`desiredConnected = false`), since retrying a permanent config problem forever isn't useful.
+
 ### Command pipeline
 `chatClient.ts` (tmi.js `message` event) → `commandRouter.ts` (parses `!word`, resolves aliases via
 `settingsService.resolveCommandByWord`, checks `permissions.ts` then `cooldowns.ts`) → one of
