@@ -44,6 +44,27 @@ The GHCR package's visibility is a GitHub-side setting independent of the repo's
 even when the source repo is public, which silently breaks anonymous `docker pull` until someone flips it
 to public in the package's own Settings → Danger Zone.
 
+**Updating the live Unraid container**: it sits inside a Docker Folder named "Personal Projects" (with
+`Whitelister` and `MultiplayerMarkdown`), and the collapsed folder row's `force update` link updates *every*
+container in the folder — expand the folder with its chevron first and use `force update` on Quotation's own
+row. The confirmation dialog reads "Update container: Quotation" when it's correctly scoped. Clicking the
+container's *name* opens the edit template instead, whose `APPLY` button stays greyed out until a field
+actually changes, so it can't refresh an image; the icon's context menu (WebUI / Console / Stop / Pause /
+Restart / Logs / Edit / Remove) has no update entry for a container in a folder either. A successful update
+can still log `Status: Image is up to date for ghcr.io/sweevee1/quotation:latest` with
+`TOTAL DATA PULLED: 0 B` — that's Docker confirming the local image already matched the registry after
+contacting it (the update check usually pulled it moments earlier), not a skipped pull. To verify what's
+actually running, compare the container's image ID against the published manifest's config digest — they're
+the same value, so they match exactly when the container is on the current build:
+
+```
+docker inspect --format '{{.Image}}' Quotation
+TOKEN=$(curl -s "https://ghcr.io/token?scope=repository:sweevee1/quotation:pull&service=ghcr.io" | jq -r .token)
+curl -s -H "Authorization: Bearer $TOKEN" \
+  -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+  https://ghcr.io/v2/sweevee1/quotation/manifests/latest | jq -r .config.digest
+```
+
 ## Architecture
 
 ### Twitch auth is two independent token flows
