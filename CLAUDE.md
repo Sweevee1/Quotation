@@ -74,12 +74,32 @@ warning to click through per cert (not per session) since it's self-signed, not 
 ### The bot has no manual start/stop
 `server/src/twitch/chatClient.ts` auto-connects whenever authorized + a channel is configured — triggered
 from server boot (`index.ts`), right after OAuth completes, and right after Twitch settings are saved
-(`routes/settings.ts`). `connectBot()` is a no-op if already connected/connecting — this guard exists
-because Twitch IRC kicks duplicate logins, and without it, multiple auto-connect triggers firing close
-together caused a connect/disconnect loop. Each tmi.js client instance's event handlers check
-`client === thisClient` before touching shared state, so a stale/superseded client's belated "disconnected"
-event can't clobber a newer working connection. There is no user-facing connect/disconnect control; the
-Dashboard only displays status.
+(`routes/settings.ts`). `connectBot()` is a no-op if already connected, or if a connect attempt is
+already in flight — this guard exists because Twitch IRC kicks duplicate logins, and without it,
+multiple auto-connect triggers firing close together caused a connect/disconnect loop. Each tmi.js
+client instance's event handlers check `client === thisClient` before touching shared state, so a
+stale/superseded client's belated "disconnected" event can't clobber a newer working connection.
+There is no user-facing connect/disconnect control; the Dashboard only displays status.
+
+**The duplicate-login guard keys off `connectInFlight`, never off `status === "connecting"`** — those
+are two different things: `connectInFlight` means an attempt is genuinely running right now, while
+`status === "connecting"` also covers "a drop happened and a retry is queued". Conflating them
+silently killed auto-reconnect: both retry paths (the tmi.js `disconnected` handler and the
+connect-timeout catch) set the status to `"connecting"` before scheduling, so when the retry fired,
+`connectBot()` saw its own placeholder status and returned having done nothing. After its first
+unexpected drop the bot never came back — it sat at `"connecting"` forever and needed a container
+restart to clear (confirmed live on the production Unraid instance, whose `/api/bot/status` read
+`{"status":"connecting","channel":"sweevee","botLogin":"sweevbot","error":""}` — the empty `error`
+is tmi.js's disconnect reason for a plain socket drop, which the `disconnected` handler now
+normalizes to a readable message). This is also why the 20s connect-timeout below didn't help on its
+own — it correctly turned a hung handshake into a retry, and that retry hit the same dead guard.
+`connectInFlight` is set **synchronously before the first `await`** in `connectBot()`, so two
+near-simultaneous triggers can't both get past it, and cleared in a `finally`. Both retry paths go
+through `scheduleReconnect()`, which keeps at most one pending `reconnectTimer` and backs off
+exponentially from `RECONNECT_DELAY_MS` (5s) to `RECONNECT_MAX_DELAY_MS` (60s), resetting
+`reconnectAttempts` on a successful `connected` event — the backoff exists because every attempt
+calls `getValidBotAccessToken()`, which may hit Twitch's token endpoint. `disconnectBot()` clears the
+pending timer and resets the counter, so a deliberate disconnect doesn't get undone by a stale retry.
 
 **`connectBot()`'s IRC handshake is wrapped in a 20s timeout** (`CONNECT_TIMEOUT_MS`, `withTimeout()` in
 `chatClient.ts`) because tmi.js's `connect()` promise can hang indefinitely on a stalled handshake — it

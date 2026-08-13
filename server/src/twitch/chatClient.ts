@@ -13,8 +13,20 @@ let status: BotConnectionStatus = "disconnected";
 let lastError: string | null = null;
 /** True once the user has asked to connect; drives auto-reconnect on unexpected drops. */
 let desiredConnected = false;
+/**
+ * True only while a connect attempt is genuinely in flight. This is what guards against
+ * duplicate logins — deliberately *not* `status === "connecting"`, which also covers the idle
+ * gap between a drop and its scheduled retry. Conflating the two is what previously broke
+ * auto-reconnect entirely: the retry fired while status was still "connecting" and connectBot()
+ * bailed at its own guard, so after the first unexpected drop the bot never came back.
+ */
+let connectInFlight = false;
+let reconnectTimer: NodeJS.Timeout | null = null;
+/** Consecutive failed attempts, for backoff. Reset once a connection actually establishes. */
+let reconnectAttempts = 0;
 
 const RECONNECT_DELAY_MS = 5000;
+const RECONNECT_MAX_DELAY_MS = 60000;
 const CONNECT_TIMEOUT_MS = 20000;
 
 const CONNECT_TIMEOUT_ERROR = "Connection attempt to Twitch IRC timed out";
@@ -33,6 +45,31 @@ function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promi
       },
     );
   });
+}
+
+function clearReconnectTimer(): void {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+}
+
+/**
+ * Queues the single pending reconnect attempt. Backs off exponentially (capped) so a Twitch-side
+ * outage isn't hammered every 5s indefinitely — every attempt re-checks/refreshes the bot token,
+ * which means hitting Twitch's token endpoint too.
+ */
+function scheduleReconnect(): void {
+  if (reconnectTimer) return;
+  const delay = Math.min(RECONNECT_DELAY_MS * 2 ** reconnectAttempts, RECONNECT_MAX_DELAY_MS);
+  reconnectAttempts += 1;
+  logger.info({ delay, attempt: reconnectAttempts }, "Scheduling Twitch chat reconnect");
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    if (desiredConnected && !client && !connectInFlight) {
+      connectBot().catch((err) => logger.error({ err }, "Reconnect failed"));
+    }
+  }, delay);
 }
 
 export async function getBotStatus(): Promise<BotStatus> {
@@ -61,29 +98,33 @@ export async function connectBot(): Promise<void> {
   // If we're already connected or mid-connect, calling through again would tear down a
   // perfectly good client and reconnect for no reason — which Twitch IRC treats as a
   // duplicate login and starts kicking, producing an endless connect/disconnect loop.
-  if (status === "connected" || status === "connecting") {
+  if (status === "connected" || connectInFlight) {
     desiredConnected = true;
     return;
   }
 
   desiredConnected = true;
-
-  const channelLogin = await getSetting("twitch_channel");
-  const botLogin = await getSetting("twitch_bot_login");
-  if (!channelLogin || !botLogin || !(await isBotAuthorized())) {
-    setStatus("error", "Twitch channel/bot account is not fully configured yet");
-    desiredConnected = false;
-    return;
-  }
-
-  if (client) {
-    await client.disconnect().catch(() => undefined);
-    client = null;
-  }
-
-  setStatus("connecting");
+  // Set synchronously, before the first await, so two near-simultaneous triggers can't both get
+  // past the guard and open competing IRC connections.
+  connectInFlight = true;
+  clearReconnectTimer();
 
   try {
+    const channelLogin = await getSetting("twitch_channel");
+    const botLogin = await getSetting("twitch_bot_login");
+    if (!channelLogin || !botLogin || !(await isBotAuthorized())) {
+      setStatus("error", "Twitch channel/bot account is not fully configured yet");
+      desiredConnected = false;
+      return;
+    }
+
+    if (client) {
+      await client.disconnect().catch(() => undefined);
+      client = null;
+    }
+
+    setStatus("connecting");
+
     const accessToken = await getValidBotAccessToken();
 
     const thisClient = new TmiClient({
@@ -95,19 +136,19 @@ export async function connectBot(): Promise<void> {
 
     thisClient.on("connected", () => {
       // Ignore events from a client we've since superseded/torn down.
-      if (client === thisClient) setStatus("connected");
+      if (client !== thisClient) return;
+      reconnectAttempts = 0;
+      setStatus("connected");
     });
 
     thisClient.on("disconnected", (reason: string) => {
       if (client !== thisClient) return;
       client = null;
       if (desiredConnected) {
-        setStatus("connecting", reason);
-        setTimeout(() => {
-          if (desiredConnected && !client) {
-            connectBot().catch((err) => logger.error({ err }, "Reconnect failed"));
-          }
-        }, RECONNECT_DELAY_MS);
+        // tmi.js hands back an empty reason for a plain socket drop; keep something readable
+        // in the status so the Dashboard shows why it's reconnecting.
+        setStatus("connecting", reason?.trim() || "Connection to Twitch IRC dropped");
+        scheduleReconnect();
       } else {
         setStatus("disconnected");
       }
@@ -136,21 +177,22 @@ export async function connectBot(): Promise<void> {
     if (timedOut && desiredConnected) {
       logger.warn({ err }, "Twitch IRC connect attempt timed out; retrying");
       setStatus("connecting", CONNECT_TIMEOUT_ERROR);
-      setTimeout(() => {
-        if (desiredConnected && !client) {
-          connectBot().catch((e) => logger.error({ err: e }, "Reconnect failed"));
-        }
-      }, RECONNECT_DELAY_MS);
+      scheduleReconnect();
     } else {
       logger.error({ err }, "Failed to connect Twitch chat bot");
       setStatus("error", err instanceof Error ? err.message : "Unknown connection error");
       desiredConnected = false;
+      clearReconnectTimer();
     }
+  } finally {
+    connectInFlight = false;
   }
 }
 
 export async function disconnectBot(): Promise<void> {
   desiredConnected = false;
+  clearReconnectTimer();
+  reconnectAttempts = 0;
   if (client) {
     await client.disconnect().catch(() => undefined);
     client = null;
