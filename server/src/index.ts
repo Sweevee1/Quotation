@@ -3,7 +3,7 @@ import { env } from "./config/env.js";
 import { logger } from "./logger.js";
 import { runMigrations } from "./db/client.js";
 import { ensureBootstrap, getSetting } from "./services/settingsService.js";
-import { createApp } from "./app.js";
+import { createApp, createPublicApp } from "./app.js";
 import { connectBot } from "./twitch/chatClient.js";
 import { isBotAuthorized, getValidBotAccessToken } from "./twitch/oauth.js";
 import { startStreamMonitor } from "./twitch/streamMonitor.js";
@@ -17,6 +17,12 @@ const app = createApp();
 app.listen(env.PORT, () => {
   logger.info(`Quotation server listening on port ${env.PORT}`);
 });
+
+if (env.PUBLIC_PORT) {
+  createPublicApp().listen(env.PUBLIC_PORT, () => {
+    logger.info(`Quotation public quotes page listening on port ${env.PUBLIC_PORT}`);
+  });
+}
 
 // Opt-in bundled HTTPS listener for deployments with no reverse-proxy TLS termination —
 // exists solely so the Twitch OAuth redirect URI can be HTTPS, which Twitch requires for

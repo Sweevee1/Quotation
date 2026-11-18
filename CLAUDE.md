@@ -219,3 +219,22 @@ first when adding an endpoint.
 The design system lives in `web/src/styles.css` as CSS custom properties (`--accent`, `--panel`, etc.) plus
 reusable classes (`.panel`/`.panel-header`/`.panel-body`, `.data-table`, `.btn`/`.icon-btn`, `.pill`,
 `.trigger-badge`). New pages should compose these rather than introducing one-off styles.
+
+### Public quotes page and SweevElements link
+Added 2026-11-18. **API key:** `services/integrationService.ts` (`integration_api_key_hash` = SHA-256 of a
+`qtn_`+64-hex key, shown once; constant-time verify), `middleware/requireApiKey.ts` (Bearer or `X-Api-Key`),
+`middleware/rateLimit.ts`. Machine API `routes/integration.ts` at `/api/integration/v1` (`/ping`, `/quotes`,
+`/quotes/:id`), read-only, restricted DTO `PublicQuote {id,text,author,game,createdAt}` — never
+`addedBy`/`edited*`.
+
+**Standalone page:** `routes/publicQuotes.ts` + `services/publicQuotesPage.ts` serve `/public/quotes` and
+`/public/quotes/:id` (`/quotes` is the admin SPA route), server-rendered in Quotation's own look (inlined
+tokens, `color-scheme: dark`), strict CSP with no scripts, off by default (setting `public_page_enabled`),
+identical 404 when off. Optional env `PUBLIC_PORT` starts a second Express app (`createPublicApp()` in
+`app.ts`) that serves ONLY that page, so one port can be exposed without the admin login. The SPA fallback
+regex excludes `/public`.
+
+**Settings UI:** `web/src/components/IntegrationPanel.tsx`; endpoints `GET/PUT /api/settings/integration`,
+`POST/DELETE /api/settings/integration/key`. **Check:** `node --import tsx scripts/integration-check.ts`
+from `server/` (spawns the server on a scratch DATA_DIR). `web` `tsc` has 4 pre-existing `App.tsx`
+`isActive` implicit-any errors unrelated to this.

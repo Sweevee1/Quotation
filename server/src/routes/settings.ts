@@ -1,4 +1,13 @@
 import { Router } from "express";
+import { z } from "zod";
+import { env } from "../config/env.js";
+import {
+  hasApiKey,
+  isPublicPageEnabled,
+  regenerateApiKey,
+  revokeApiKey,
+  setPublicPageEnabled,
+} from "../services/integrationService.js";
 import {
   commandConfigUpdateSchema,
   commandNameSchema,
@@ -101,5 +110,48 @@ settingsRouter.put(
     }
     const updated = await updateCommandConfig(nameParsed.data, bodyParsed.data);
     res.json(updated);
+  }),
+);
+
+// --- Integration: API key for linked apps + the standalone public quotes page ---
+
+settingsRouter.get(
+  "/integration",
+  asyncHandler(async (_req, res) => {
+    res.json({
+      hasApiKey: await hasApiKey(),
+      publicPageEnabled: await isPublicPageEnabled(),
+      publicPath: "/public/quotes",
+      publicPort: env.PUBLIC_PORT ?? null,
+    });
+  }),
+);
+
+settingsRouter.put(
+  "/integration",
+  asyncHandler(async (req, res) => {
+    const parsed = z.object({ publicPageEnabled: z.boolean() }).safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid input" });
+      return;
+    }
+    await setPublicPageEnabled(parsed.data.publicPageEnabled);
+    res.json({ ok: true });
+  }),
+);
+
+/** Generates (or replaces) the API key. The plaintext is returned exactly once. */
+settingsRouter.post(
+  "/integration/key",
+  asyncHandler(async (_req, res) => {
+    res.json({ apiKey: await regenerateApiKey() });
+  }),
+);
+
+settingsRouter.delete(
+  "/integration/key",
+  asyncHandler(async (_req, res) => {
+    await revokeApiKey();
+    res.json({ ok: true });
   }),
 );

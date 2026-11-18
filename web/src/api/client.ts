@@ -93,6 +93,18 @@ export const api = {
     request<{ ok: boolean }>("/api/settings/twitch/auth", { method: "DELETE" }),
   getTwitchAuthStatus: () => request<{ authorized: boolean }>("/api/settings/twitch/auth-status"),
 
+  getIntegration: () =>
+    request<{ hasApiKey: boolean; publicPageEnabled: boolean; publicPath: string; publicPort: number | null }>(
+      "/api/settings/integration",
+    ),
+  setPublicPageEnabled: (publicPageEnabled: boolean) =>
+    request<{ ok: boolean }>("/api/settings/integration", {
+      method: "PUT",
+      body: JSON.stringify({ publicPageEnabled }),
+    }),
+  generateApiKey: () => request<{ apiKey: string }>("/api/settings/integration/key", { method: "POST" }),
+  revokeApiKey: () => request<{ ok: boolean }>("/api/settings/integration/key", { method: "DELETE" }),
+
   getCommandConfigs: () => request<CommandConfig[]>("/api/settings/commands"),
   updateCommandConfig: (name: CommandName, patch: Partial<CommandConfig>) =>
     request<CommandConfig>(`/api/settings/commands/${name}`, {
