@@ -1,6 +1,7 @@
 import path from "node:path";
 import { existsSync } from "node:fs";
 import express, { type NextFunction, type Request, type Response } from "express";
+import { env } from "./config/env.js";
 import { logger } from "./logger.js";
 import { sessionMiddleware } from "./auth/session.js";
 import { authRouter } from "./routes/auth.js";
@@ -30,7 +31,7 @@ function requestLogger(req: Request, res: Response, next: NextFunction): void {
  */
 export function createPublicApp(): express.Express {
   const app = express();
-  app.set("trust proxy", 1);
+  app.set("trust proxy", env.TRUST_PROXY);
   app.disable("x-powered-by");
   app.use(requestLogger);
   app.use(publicQuotesRouter);
@@ -44,7 +45,7 @@ export function createApp(): express.Express {
   const app = express();
 
   // Needed so req.protocol reflects X-Forwarded-Proto when sitting behind a reverse proxy.
-  app.set("trust proxy", 1);
+  app.set("trust proxy", env.TRUST_PROXY);
 
   app.use(requestLogger);
   app.use(express.json());

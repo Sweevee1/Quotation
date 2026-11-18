@@ -19,7 +19,7 @@ import { asyncHandler } from "../middleware/asyncHandler.js";
  * return the same 404 body. Exposes only the restricted PublicQuote fields.
  */
 export const publicQuotesRouter = Router();
-publicQuotesRouter.use(rateLimit("public", 90));
+publicQuotesRouter.use(PUBLIC_QUOTES_BASE, rateLimit("public", 90));
 
 const PAGE_SIZE = 25;
 const query = z.object({
