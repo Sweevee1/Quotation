@@ -27,6 +27,12 @@ const envSchema = z.object({
    * through during authorization. Leave unset if you already have real HTTPS (e.g. via a
    * reverse proxy) — PUBLIC_URL then points at that instead.
    */
+  /**
+   * Optional port for a second listener that serves ONLY the public quotes page
+   * (/public/quotes). Forward or tunnel this port instead of PORT to publish the quotes
+   * without exposing the admin UI. Leave unset to serve it on PORT only.
+   */
+  PUBLIC_PORT: z.coerce.number().int().min(1).max(65535).optional(),
   TLS_PORT: z.coerce.number().int().min(1).max(65535).optional(),
 });
 

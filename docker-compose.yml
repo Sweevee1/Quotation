@@ -8,6 +8,8 @@ services:
       # Uncomment along with TLS_PORT below if you have no reverse-proxy TLS termination and
       # need Twitch OAuth to work — see README's "HTTPS for Twitch OAuth" section.
       # - "8767:8767"
+      # Public quotes page only (no admin login): uncomment with PUBLIC_PORT below and forward/tunnel just this port.
+      # - "8768:8768"
     volumes:
       - ./data:/app/data
     env_file:
@@ -18,4 +20,5 @@ services:
       - NODE_ENV=production
       # - TLS_PORT=8767
       # - PUBLIC_URL=https://your-server-address:8767
+      # - PUBLIC_PORT=8768
     restart: unless-stopped

@@ -54,6 +54,7 @@ A pre-built image is published to GHCR on every push: `ghcr.io/sweevee1/quotatio
    | `SESSION_SECRET` | any long random string (e.g. generate one with `openssl rand -hex 32`) |
    | `PUBLIC_URL` | your externally-reachable `https://` address if you're putting this behind a reverse proxy, e.g. `https://quotation.yourdomain.com` — otherwise, see **HTTPS for Twitch OAuth without a reverse proxy** above |
    | `TLS_PORT` | only if you followed the section above without a reverse proxy, e.g. `8767` — otherwise omit |
+   | `PUBLIC_PORT` | optional, e.g. `8768`: a second port that serves only the public quotes page (see "Public quotes page" below) |
 4. Apply, then open `http://<your-unraid-ip>:8766`, log in with `WEBUI_PASSWORD`, enter your channel name plus the Twitch Client ID/Secret from step 1 in Settings and save, then go to the Dashboard and click **Connect with Twitch**.
 
 The SQLite database lives at `/mnt/user/appdata/quotation/quotation.db` on the host, so it survives container updates/recreation.
@@ -85,6 +86,16 @@ npm run dev
 ```
 
 Open http://localhost:5173, log in with `WEBUI_PASSWORD`, enter your channel name and Twitch Client ID/Secret in Settings, then go to the Dashboard and click **Connect with Twitch** to authorize the bot account.
+
+## Public quotes page and linking to SweevElements
+
+Viewers can browse every quote (and see exactly what `!quote 64` will say) in one of two ways. Both only ever show the quote number, text, author, game and date, never who added it.
+
+**Linked to SweevElements (like Prowlarr to Radarr).** In Quotation open **Settings, Integrations & public page** and generate an API key (shown once, only its hash is stored). In SweevElements open **Settings, Quotation** and enter this app's address (as SweevElements can reach it, for example `http://192.168.1.10:8766`) plus the key. SweevElements checks the key, then serves the list at `https://<your-sweevelements>/<channel>/quotes`, next to the tip page and in its look. SweevElements pulls from Quotation server-side, so Quotation does not need to be reachable from the internet.
+
+**Quotation on its own.** Switch on **Publish a read-only list of quotes** in the same panel. The page is `/public/quotes` (also `/public/quotes/64`), in Quotation's own look. It is off by default. To publish it without exposing the admin login, set `PUBLIC_PORT` (for example `8768`) and map that port too, then forward or tunnel only that port: it serves nothing except the public page.
+
+Machine API used by the link (Bearer or `X-Api-Key`): `GET /api/integration/v1/ping`, `/quotes?page=&pageSize=&search=`, `/quotes/:id`. Check script: `node --import tsx server/scripts/integration-check.ts` from `server/`.
 
 ## Permission tiers
 

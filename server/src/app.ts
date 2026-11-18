@@ -10,6 +10,8 @@ import { botRouter } from "./routes/bot.js";
 import { eventsRouter } from "./routes/events.js";
 import { twitchOAuthRouter } from "./routes/twitchOAuth.js";
 import { backupsRouter } from "./routes/backups.js";
+import { integrationRouter } from "./routes/integration.js";
+import { publicQuotesRouter } from "./routes/publicQuotes.js";
 
 function requestLogger(req: Request, res: Response, next: NextFunction): void {
   const start = Date.now();
@@ -20,6 +22,22 @@ function requestLogger(req: Request, res: Response, next: NextFunction): void {
     );
   });
   next();
+}
+
+/**
+ * A second, minimal app that serves ONLY the public quotes page. Started on PUBLIC_PORT so
+ * that one port can be forwarded/tunnelled without exposing the admin login or API.
+ */
+export function createPublicApp(): express.Express {
+  const app = express();
+  app.set("trust proxy", 1);
+  app.disable("x-powered-by");
+  app.use(requestLogger);
+  app.use(publicQuotesRouter);
+  app.use((_req, res) => {
+    res.status(404).type("text/plain").send("Not found");
+  });
+  return app;
 }
 
 export function createApp(): express.Express {
@@ -39,12 +57,14 @@ export function createApp(): express.Express {
   app.use("/api/bot", botRouter);
   app.use("/api/events", eventsRouter);
   app.use("/api/backups", backupsRouter);
+  app.use("/api/integration/v1", integrationRouter);
+  app.use(publicQuotesRouter);
   app.use(twitchOAuthRouter);
 
   const webDist = path.join(import.meta.dirname, "../../web/dist");
   if (existsSync(webDist)) {
     app.use(express.static(webDist));
-    app.get(/^(?!\/api|\/twitch).*/, (_req, res) => {
+    app.get(/^(?!\/api|\/twitch|\/public).*/, (_req, res) => {
       res.sendFile(path.join(webDist, "index.html"));
     });
   }

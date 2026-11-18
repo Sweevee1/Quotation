@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { ROLES, type CommandConfig, type CommandName, type Role, type TwitchSettings } from "@quotation/shared";
 import { api } from "../api/client.js";
 import { IconChevronDown } from "../icons.js";
+import IntegrationPanel from "../components/IntegrationPanel.js";
 
 function CommandRow({ config, onSave }: { config: CommandConfig; onSave: (name: CommandName, patch: Partial<CommandConfig>) => Promise<void> }) {
   const [expanded, setExpanded] = useState(false);
@@ -350,6 +351,8 @@ export default function SettingsPage() {
         </div>
         )}
       </div>
+
+      <IntegrationPanel />
 
       <div className="panel" style={{ marginTop: 14 }}>
         <div
