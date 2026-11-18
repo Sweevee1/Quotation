@@ -84,7 +84,13 @@ export function createApp(): express.Express {
       next(err);
       return;
     }
-    logger.error({ err, method: req.method, url: req.originalUrl }, "Unhandled request error");
+    // body-parser errors (413 too large, 400 malformed JSON) carry a 4xx status; pass it through.
+    const status = (err as { status?: number; statusCode?: number })?.status ?? (err as { statusCode?: number })?.statusCode;
+    if (typeof status === "number" && status >= 400 && status < 500) {
+      res.status(status).json({ error: status === 413 ? "Payload too large" : "Bad request" });
+      return;
+    }
+    logger.error({ err, method: req.method, url: req.path }, "Unhandled request error");
     res.status(500).json({ error: "Internal server error" });
   });
 
