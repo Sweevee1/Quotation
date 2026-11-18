@@ -72,11 +72,11 @@ export interface ListQuotesOptions {
 export async function listQuotes(options: ListQuotesOptions): Promise<{ items: Quote[]; total: number }> {
   const { search, page, pageSize } = options;
   // Escape LIKE wildcards so user input matches literally.
-  const pattern = `%${(search ?? "").replace(/[\%_]/g, "\$&")}%`;
+  const pattern = `%${(search ?? "").replace(/[\\%_]/g, "\\$&")}%`;
   const whereClause = search
     ? or(
-        sql`${quotes.text} LIKE ${pattern} ESCAPE '\'`,
-        sql`${quotes.author} LIKE ${pattern} ESCAPE '\'`,
+        sql`${quotes.text} LIKE ${pattern} ESCAPE '\\'`,
+        sql`${quotes.author} LIKE ${pattern} ESCAPE '\\'`,
       )
     : undefined;
 
