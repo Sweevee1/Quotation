@@ -36,6 +36,9 @@ file, or production deployments will silently run without your new columns/table
 
 Hosted at `github.com/Sweevee1/quotation` (public repo). `.github/workflows/docker.yml` builds and pushes
 the Docker image to `ghcr.io/sweevee1/quotation:latest` on every push to `main` — no manual publish step.
+`[skip ci]` in the commit message suppresses that build (used 2026-11-19 for the SweevElements integration
+commit cbffa69 to push without publishing an image); the next normal push builds it, and the Unraid
+container only changes after its own Force update.
 The primary install target is Unraid (pull the GHCR image directly via the Docker tab); `README.md` has the
 field-by-field container setup. `docker compose` (this repo's `docker-compose.yml`) is the alternative for
 any other Docker host, building the image locally instead of pulling.
