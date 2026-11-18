@@ -16,7 +16,7 @@ const envSchema = z.object({
    * used to build the Twitch OAuth redirect URI. If unset, it's auto-detected from the
    * incoming request's protocol/host (respecting X-Forwarded-Proto behind a reverse proxy).
    */
-  PUBLIC_URL: z.string().url().optional(),
+  PUBLIC_URL: z.url().optional(),
   /**
    * Optional port for a bundled self-signed HTTPS listener, serving the same app as PORT.
    * Twitch requires the OAuth redirect URI to be HTTPS for anything but literal "localhost" —
