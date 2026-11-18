@@ -36,7 +36,15 @@ export function createPublicApp(): express.Express {
   app.use(requestLogger);
   app.use(publicQuotesRouter);
   app.use((_req, res) => {
-    res.status(404).type("text/plain").send("Not found");
+    res.status(404).set("Cache-Control", "no-store").type("text/plain").send("Not found");
+  });
+  app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
+    if (res.headersSent) {
+      next(err);
+      return;
+    }
+    logger.error({ err, method: req.method, url: req.path }, "Unhandled request error");
+    res.status(500).set("Cache-Control", "no-store").type("text/plain").send("Internal server error");
   });
   return app;
 }

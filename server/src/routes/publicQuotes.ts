@@ -24,7 +24,7 @@ publicQuotesRouter.use(PUBLIC_QUOTES_BASE, rateLimit("public", 90));
 const PAGE_SIZE = 25;
 const query = z.object({
   q: z.string().trim().max(100).optional(),
-  page: z.coerce.number().int().min(1).max(100000).default(1),
+  page: z.coerce.number().int().min(1).max(1000).default(1),
   n: z.coerce.number().int().min(1).max(2_000_000_000).optional(),
 });
 
@@ -35,7 +35,7 @@ function send(res: Response, status: number, html: (nonce: string) => string): v
     .set({
       "Content-Type": "text/html; charset=utf-8",
       "Content-Security-Policy": cspHeader(nonce),
-      "Cache-Control": "public, max-age=30",
+      "Cache-Control": status === 200 ? "public, max-age=30" : "no-store",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "no-referrer",
     })

@@ -1,4 +1,4 @@
-import { count, eq, like, or, sql } from "drizzle-orm";
+import { count, eq, or, sql } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { quotes } from "../db/schema.js";
 import type { Quote, QuoteCreateInput, QuoteUpdateInput } from "@quotation/shared";
@@ -71,8 +71,13 @@ export interface ListQuotesOptions {
 
 export async function listQuotes(options: ListQuotesOptions): Promise<{ items: Quote[]; total: number }> {
   const { search, page, pageSize } = options;
+  // Escape LIKE wildcards so user input matches literally.
+  const pattern = `%${(search ?? "").replace(/[\%_]/g, "\$&")}%`;
   const whereClause = search
-    ? or(like(quotes.text, `%${search}%`), like(quotes.author, `%${search}%`))
+    ? or(
+        sql`${quotes.text} LIKE ${pattern} ESCAPE '\'`,
+        sql`${quotes.author} LIKE ${pattern} ESCAPE '\'`,
+      )
     : undefined;
 
   const items = (await db
