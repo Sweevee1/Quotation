@@ -114,22 +114,25 @@ export async function restoreBackup(
 
   const safety = options.skipSafetyBackup ? null : await createBackup("pre_restore");
 
-  await db.delete(quotes).run();
-  for (const item of items) {
-    await db
-      .insert(quotes)
-      .values({
-        ...(item.id !== undefined ? { id: item.id } : {}),
-        text: item.text,
-        author: item.author,
-        game: item.game,
-        createdAt: item.createdAt,
-        addedBy: item.addedBy,
-        editedAt: item.editedAt,
-        editedBy: item.editedBy,
-      })
-      .run();
-  }
+  // One transaction: a failing insert rolls back the delete instead of leaving the table empty.
+  await db.transaction(async (tx) => {
+    await tx.delete(quotes).run();
+    for (const item of items) {
+      await tx
+        .insert(quotes)
+        .values({
+          ...(item.id !== undefined ? { id: item.id } : {}),
+          text: item.text,
+          author: item.author,
+          game: item.game,
+          createdAt: item.createdAt,
+          addedBy: item.addedBy,
+          editedAt: item.editedAt,
+          editedBy: item.editedBy,
+        })
+        .run();
+    }
+  });
 
   // AUTOINCREMENT's sqlite_sequence counter tracks the highest id ever inserted and doesn't
   // drop when rows are deleted, so without this the next plain (id-less) insert would resume
