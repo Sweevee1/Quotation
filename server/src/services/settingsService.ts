@@ -117,7 +117,7 @@ export async function deleteSetting(key: string): Promise<void> {
 /** Seeds first-run defaults: WebUI password hash and per-command config rows. */
 export async function ensureBootstrap(): Promise<void> {
   if (!(await getSetting("webui_password_hash"))) {
-    const hash = hashPassword(env.WEBUI_PASSWORD);
+    const hash = await hashPassword(env.WEBUI_PASSWORD);
     await setSetting("webui_password_hash", hash);
     logger.info(
       "Seeded WebUI password from WEBUI_PASSWORD env var — change it from the Settings page.",
