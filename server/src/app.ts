@@ -18,7 +18,7 @@ function requestLogger(req: Request, res: Response, next: NextFunction): void {
   const start = Date.now();
   res.on("finish", () => {
     logger.info(
-      { method: req.method, url: req.originalUrl, status: res.statusCode, ms: Date.now() - start },
+      { method: req.method, url: req.path === "/twitch/callback" ? req.path : req.originalUrl, status: res.statusCode, ms: Date.now() - start },
       "request",
     );
   });
