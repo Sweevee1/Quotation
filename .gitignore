@@ -5,3 +5,9 @@ data/
 *.log
 .DS_Store
 *.tsbuildinfo
+.env.*
+!.env.example
+*.pem
+*.key
+*.db
+*.db-*
