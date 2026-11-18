@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { loginSchema, passwordChangeSchema } from "@quotation/shared";
-import { hashPassword, verifyPassword } from "../auth/password.js";
-import { requireAuth } from "../middleware/requireAuth.js";
+import { hashPassword, passwordFingerprint, verifyPassword } from "../auth/password.js";
+import { isSessionValid, requireAuth } from "../middleware/requireAuth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { asyncHandler } from "../middleware/asyncHandler.js";
 import { getSetting, setSetting } from "../services/settingsService.js";
@@ -27,7 +27,7 @@ authRouter.post(
       return;
     }
 
-    req.session = { authed: true };
+    req.session = { authed: true, pw: passwordFingerprint(hash) };
     res.json({ authed: true });
   }),
 );
@@ -37,9 +37,12 @@ authRouter.post("/logout", (req, res) => {
   res.json({ authed: false });
 });
 
-authRouter.get("/me", (req, res) => {
-  res.json({ authed: Boolean(req.session?.authed) });
-});
+authRouter.get(
+  "/me",
+  asyncHandler(async (req, res) => {
+    res.json({ authed: await isSessionValid(req) });
+  }),
+);
 
 authRouter.post(
   "/change-password",
@@ -58,7 +61,10 @@ authRouter.post(
       return;
     }
 
-    await setSetting("webui_password_hash", await hashPassword(parsed.data.newPassword));
+    const newHash = await hashPassword(parsed.data.newPassword);
+    await setSetting("webui_password_hash", newHash);
+    // Re-issue this session for the new password; every other existing cookie is now invalid.
+    req.session = { authed: true, pw: passwordFingerprint(newHash) };
     res.json({ ok: true });
   }),
 );
