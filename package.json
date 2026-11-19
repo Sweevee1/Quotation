@@ -16,7 +16,7 @@
     "db:migrate": "npm run db:migrate -w server"
   },
   "devDependencies": {
-    "concurrently": "^9.1.0",
+    "concurrently": "^10.0.7",
     "typescript": "^5.7.2"
   },
   "engines": {
