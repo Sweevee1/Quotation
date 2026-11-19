@@ -3,6 +3,7 @@ import { db } from "../db/client.js";
 import { commandSettings, settings } from "../db/schema.js";
 import type { CommandConfig, CommandName } from "@quotation/shared";
 import { hashPassword } from "../auth/password.js";
+import { decryptSecret, encryptSecret, isEncrypted } from "../auth/secretBox.js";
 import { env } from "../config/env.js";
 import { logger } from "../logger.js";
 
@@ -97,17 +98,37 @@ const DEFAULT_COMMANDS: Record<
   },
 };
 
-export async function getSetting(key: string): Promise<string | undefined> {
+/** Settings holding credentials; encrypted at rest (see auth/secretBox.ts). */
+const SECRET_KEYS = new Set([
+  "twitch_client_secret",
+  "twitch_bot_access_token",
+  "twitch_bot_refresh_token",
+]);
+
+async function readRaw(key: string): Promise<string | undefined> {
   const row = await db.select().from(settings).where(eq(settings.key, key)).get();
   return row?.value;
 }
 
-export async function setSetting(key: string, value: string): Promise<void> {
+async function writeRaw(key: string, value: string): Promise<void> {
   await db
     .insert(settings)
     .values({ key, value })
     .onConflictDoUpdate({ target: settings.key, set: { value } })
     .run();
+}
+
+export async function getSetting(key: string): Promise<string | undefined> {
+  const value = await readRaw(key);
+  if (value === undefined || !SECRET_KEYS.has(key)) return value;
+  if (isEncrypted(value)) return decryptSecret(value);
+  // Legacy plaintext row: migrate to encrypted on first read.
+  await writeRaw(key, encryptSecret(value));
+  return value;
+}
+
+export async function setSetting(key: string, value: string): Promise<void> {
+  await writeRaw(key, SECRET_KEYS.has(key) ? encryptSecret(value) : value);
 }
 
 export async function deleteSetting(key: string): Promise<void> {
@@ -117,6 +138,10 @@ export async function deleteSetting(key: string): Promise<void> {
 /** Seeds first-run defaults: WebUI password hash and per-command config rows. */
 export async function ensureBootstrap(): Promise<void> {
   if (!(await getSetting("webui_password_hash"))) {
+    // Only the first-run seed is checked, so existing installs with a shorter password still boot.
+    if (env.NODE_ENV === "production" && env.WEBUI_PASSWORD.length < 12) {
+      throw new Error("Refusing to seed: WEBUI_PASSWORD must be at least 12 characters in production.");
+    }
     const hash = await hashPassword(env.WEBUI_PASSWORD);
     await setSetting("webui_password_hash", hash);
     logger.info(

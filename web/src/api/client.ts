@@ -35,7 +35,8 @@ export interface QuoteImportItem {
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(path, {
-    headers: { "Content-Type": "application/json" },
+    // X-Requested-With: a custom header cross-site forms cannot send; the server requires it on non-GET /api calls (CSRF defence).
+    headers: { "Content-Type": "application/json", "X-Requested-With": "quotation" },
     ...options,
   });
   if (!res.ok) {

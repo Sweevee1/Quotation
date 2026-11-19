@@ -34,8 +34,12 @@ const envSchema = z.object({
    */
   PUBLIC_PORT: z.coerce.number().int().min(1).max(65535).optional(),
   TLS_PORT: z.coerce.number().int().min(1).max(65535).optional(),
-  /** Number of reverse-proxy hops to trust for X-Forwarded-* (client IP, protocol). Set 0 if directly exposed. */
-  TRUST_PROXY: z.coerce.number().int().min(0).max(10).default(1),
+  /**
+   * Number of reverse-proxy hops to trust for X-Forwarded-* (client IP, protocol). Defaults to 0
+   * (trust none) because with no proxy overwriting X-Forwarded-For, any value above 0 lets a client
+   * spoof its IP and bypass the per-IP login rate limit. Set to the real hop count behind a proxy/tunnel.
+   */
+  TRUST_PROXY: z.coerce.number().int().min(0).max(10).default(0),
 });
 
 export const env = envSchema.parse(process.env);

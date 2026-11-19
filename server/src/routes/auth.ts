@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { loginSchema, passwordChangeSchema } from "@quotation/shared";
-import { hashPassword, passwordFingerprint, verifyPassword } from "../auth/password.js";
-import { isSessionValid, requireAuth } from "../middleware/requireAuth.js";
+import { hashPassword, verifyPassword } from "../auth/password.js";
+import { bumpSessionEpoch, isSessionValid, requireAuth, sessionToken } from "../middleware/requireAuth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { asyncHandler } from "../middleware/asyncHandler.js";
 import { getSetting, setSetting } from "../services/settingsService.js";
@@ -27,15 +27,21 @@ authRouter.post(
       return;
     }
 
-    req.session = { authed: true, pw: passwordFingerprint(hash) };
+    req.session = { authed: true, pw: await sessionToken(hash) };
     res.json({ authed: true });
   }),
 );
 
-authRouter.post("/logout", (req, res) => {
-  req.session = null;
-  res.json({ authed: false });
-});
+authRouter.post(
+  "/logout",
+  asyncHandler(async (req, res) => {
+    // Revoke server-side too (invalidates every issued cookie). Only a valid session may do this,
+    // so an anonymous request can't log the admin out.
+    if (await isSessionValid(req)) await bumpSessionEpoch();
+    req.session = null;
+    res.json({ authed: false });
+  }),
+);
 
 authRouter.get(
   "/me",
@@ -64,7 +70,8 @@ authRouter.post(
     const newHash = await hashPassword(parsed.data.newPassword);
     await setSetting("webui_password_hash", newHash);
     // Re-issue this session for the new password; every other existing cookie is now invalid.
-    req.session = { authed: true, pw: passwordFingerprint(newHash) };
+    await bumpSessionEpoch();
+    req.session = { authed: true, pw: await sessionToken(newHash) };
     res.json({ ok: true });
   }),
 );
