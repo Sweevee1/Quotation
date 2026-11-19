@@ -7,12 +7,14 @@ export function renderQuoteTemplate(template: string, quote: Quote): string {
     ? quote.createdAt
     : date.toLocaleDateString("en-US");
 
-  return template
+  const out = template
     .replaceAll("{id}", String(quote.id))
     .replaceAll("{text}", quote.text)
     .replaceAll("{author}", quote.author)
     .replaceAll("{game}", quote.game ?? "Unknown")
     .replaceAll("{date}", formattedDate);
+  // Stop quote text from turning the reply into a Twitch/bot command ("/ban x", ".timeout x").
+  return /^[/.]/.test(out) ? `> ${out}` : out;
 }
 
 export function renderErrorTemplate(template: string, vars: Record<string, string> = {}): string {

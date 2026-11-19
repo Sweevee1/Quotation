@@ -1,6 +1,7 @@
 import path from "node:path";
 import { existsSync } from "node:fs";
 import express, { type NextFunction, type Request, type Response } from "express";
+import { env } from "./config/env.js";
 import { logger } from "./logger.js";
 import { sessionMiddleware } from "./auth/session.js";
 import { authRouter } from "./routes/auth.js";
@@ -17,7 +18,7 @@ function requestLogger(req: Request, res: Response, next: NextFunction): void {
   const start = Date.now();
   res.on("finish", () => {
     logger.info(
-      { method: req.method, url: req.originalUrl, status: res.statusCode, ms: Date.now() - start },
+      { method: req.method, url: req.path === "/twitch/callback" ? req.path : req.originalUrl, status: res.statusCode, ms: Date.now() - start },
       "request",
     );
   });
@@ -30,12 +31,20 @@ function requestLogger(req: Request, res: Response, next: NextFunction): void {
  */
 export function createPublicApp(): express.Express {
   const app = express();
-  app.set("trust proxy", 1);
+  app.set("trust proxy", env.TRUST_PROXY);
   app.disable("x-powered-by");
   app.use(requestLogger);
   app.use(publicQuotesRouter);
   app.use((_req, res) => {
-    res.status(404).type("text/plain").send("Not found");
+    res.status(404).set("Cache-Control", "no-store").type("text/plain").send("Not found");
+  });
+  app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
+    if (res.headersSent) {
+      next(err);
+      return;
+    }
+    logger.error({ err, method: req.method, url: req.path }, "Unhandled request error");
+    res.status(500).set("Cache-Control", "no-store").type("text/plain").send("Internal server error");
   });
   return app;
 }
@@ -44,7 +53,7 @@ export function createApp(): express.Express {
   const app = express();
 
   // Needed so req.protocol reflects X-Forwarded-Proto when sitting behind a reverse proxy.
-  app.set("trust proxy", 1);
+  app.set("trust proxy", env.TRUST_PROXY);
 
   app.use(requestLogger);
   app.use(express.json());
@@ -75,7 +84,13 @@ export function createApp(): express.Express {
       next(err);
       return;
     }
-    logger.error({ err, method: req.method, url: req.originalUrl }, "Unhandled request error");
+    // body-parser errors (413 too large, 400 malformed JSON) carry a 4xx status; pass it through.
+    const status = (err as { status?: number; statusCode?: number })?.status ?? (err as { statusCode?: number })?.statusCode;
+    if (typeof status === "number" && status >= 400 && status < 500) {
+      res.status(status).json({ error: status === 413 ? "Payload too large" : "Bad request" });
+      return;
+    }
+    logger.error({ err, method: req.method, url: req.path }, "Unhandled request error");
     res.status(500).json({ error: "Internal server error" });
   });
 

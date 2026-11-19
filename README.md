@@ -78,6 +78,13 @@ docker compose up -d
 
 Serves the WebUI + bot on port `8766`, with the SQLite database persisted to `./data`.
 
+### Security notes
+
+- Never forward or tunnel ports `8766`/`8767` (admin WebUI) to the internet. If you expose anything, expose only the public quotes page port (`PUBLIC_PORT`).
+- `docker-compose.yml` binds to `127.0.0.1` by default; edit the port mappings for LAN access.
+- Images are also tagged by commit SHA (`ghcr.io/sweevee1/quotation:<sha>`); pull that tag instead of `latest` if you want a pinned version.
+- Back up `./data` (the SQLite database); the container runs as uid 99:100 and fixes ownership of that folder on start.
+
 ## Running from source (development)
 
 ```
