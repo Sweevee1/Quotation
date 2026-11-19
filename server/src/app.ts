@@ -13,6 +13,7 @@ import { twitchOAuthRouter } from "./routes/twitchOAuth.js";
 import { backupsRouter } from "./routes/backups.js";
 import { integrationRouter } from "./routes/integration.js";
 import { publicQuotesRouter } from "./routes/publicQuotes.js";
+import { requireCustomHeader, securityHeaders } from "./middleware/securityHeaders.js";
 
 function requestLogger(req: Request, res: Response, next: NextFunction): void {
   const start = Date.now();
@@ -54,12 +55,15 @@ export function createApp(): express.Express {
 
   // Needed so req.protocol reflects X-Forwarded-Proto when sitting behind a reverse proxy.
   app.set("trust proxy", env.TRUST_PROXY);
+  app.disable("x-powered-by");
 
   app.use(requestLogger);
+  app.use(securityHeaders);
   app.use(express.json());
   // cookie-session's types are structurally close but not identical to express 4's RequestHandler generic.
   app.use(sessionMiddleware as unknown as express.RequestHandler);
 
+  app.use("/api", requireCustomHeader);
   app.use("/api/auth", authRouter);
   app.use("/api/quotes", quotesRouter);
   app.use("/api/settings", settingsRouter);
