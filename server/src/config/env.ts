@@ -35,11 +35,16 @@ const envSchema = z.object({
   PUBLIC_PORT: z.coerce.number().int().min(1).max(65535).optional(),
   TLS_PORT: z.coerce.number().int().min(1).max(65535).optional(),
   /**
-   * Number of reverse-proxy hops to trust for X-Forwarded-* (client IP, protocol). Defaults to 0
-   * (trust none) because with no proxy overwriting X-Forwarded-For, any value above 0 lets a client
-   * spoof its IP and bypass the per-IP login rate limit. Set to the real hop count behind a proxy/tunnel.
+   * Which peers' X-Forwarded-* headers to trust. Unset = zero-config default: trust them only when
+   * the connecting peer is a private/loopback address (a Cloudflare Tunnel, Docker/LAN reverse proxy),
+   * never when a public address connects directly, so a client can't spoof its IP to dodge the login
+   * rate limit. Express then takes the first untrusted address from the right as the client IP.
+   * Override with a hop count ("1") or an Express trust-proxy list if you need something stricter.
    */
-  TRUST_PROXY: z.coerce.number().int().min(0).max(10).default(0),
+  TRUST_PROXY: z
+    .string()
+    .default("loopback,linklocal,uniquelocal")
+    .transform((v) => (/^\d+$/.test(v) ? Number(v) : v)),
 });
 
 export const env = envSchema.parse(process.env);
