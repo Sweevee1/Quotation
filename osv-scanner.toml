@@ -1,0 +1,6 @@
+# esbuild dev-server advisory: only reachable through drizzle-kit (dev dependency, not in the
+# production image). Fixing it needs a breaking drizzle-kit upgrade; revisit by the date below.
+[[IgnoredVulns]]
+id = "GHSA-67mh-4wv8-2f99"
+ignoreUntil = 2027-02-19
+reason = "dev-only esbuild via drizzle-kit; not shipped in the runtime image"
