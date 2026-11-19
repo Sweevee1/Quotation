@@ -94,3 +94,13 @@ Counts: **1 high, 4 medium, 3 low, 2 informational**. Nothing critical.
 | F-6 | Logout and password change bump a server-side `session_epoch`, so copied cookies stop working. Verified. Every existing session is invalidated once on upgrade. |
 | F-8 | Inter is self-hosted via `@fontsource/inter`; Google Fonts links removed. |
 | I-2 | Not changed (informational). |
+
+## Final state (2026-11-19, after the zero-config change)
+The container now takes no variables (port 8766 and `/app/data` only), matching SweevElements. This supersedes the `TRUST_PROXY`, `WEBUI_PASSWORD`, `SESSION_SECRET`, `TLS_PORT`, `PUBLIC_URL` and `PUBLIC_PORT` notes above.
+
+- **F-1 (login limiter):** `TRUST_PROXY` is no longer a setting. `config/env.ts` hardcodes trusting `X-Forwarded-*` only from private/loopback peers (Cloudflare Tunnel, LAN/Docker proxy), so a public address can't spoof its IP. Someone already on the LAN still could; accepted.
+- **F-4 (weak password):** there is no env seed any more. The first visitor creates the password in the WebUI (`POST /api/auth/setup`, 8+ characters, rate limited, 409 once a password exists).
+- **F-5 (secrets at rest):** the encryption/session secret is generated into `DATA_DIR/.session-secret` (mode 0600). A legacy `SESSION_SECRET` env var still wins and is copied there. Deleting `.session-secret` makes stored Twitch credentials unreadable (re-enter the client secret, reconnect the bot).
+- **Removed on purpose:** the self-signed TLS listener, `PUBLIC_PORT` second listener, and the `selfsigned` dependency. Admin and the public page share one port and domain. Allow `/public/quotes*` through any Cloudflare Access policy and keep the origin reachable only through Cloudflare.
+- **Twitch OAuth:** register `https://YOUR-DOMAIN/twitch/callback` and click Connect from that address. The redirect URI is derived from the request host and `X-Forwarded-Proto`.
+- **Verified live (user-confirmed):** login works, the Twitch client secret persists, the bot is connected. Verified locally: `Secure` cookie only when `X-Forwarded-Proto: https`, setup refused when a password exists, secret file persisted across restarts.
