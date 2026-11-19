@@ -81,19 +81,17 @@ curl -s -H "Authorization: Bearer $TOKEN" \
   for `moderator:read:followers` (the bot account must be a channel moderator for the Follower permission
   tier to work).
 
-### Twitch OAuth requires real HTTPS — `TLS_PORT` bundles a self-signed listener for it
-Twitch rejects `http://` redirect URIs outright at app-registration time for anything but literal
-`localhost` (confirmed live in the Twitch Developer Console: "Redirect URIs must use HTTPS protocol").
-Self-hosted deployments with no TLS-terminating reverse proxy — the common case: reached directly by LAN
-IP, e.g. most Unraid installs — have no other way to satisfy that. Setting the optional `TLS_PORT` env var
-(`server/src/index.ts`) starts a second `https.createServer` on the *same* Express `app` used for the main
-`PORT` listener, using a self-signed cert `server/src/tls/selfSignedCert.ts` generates once (SAN includes
-`PUBLIC_URL`'s hostname if set, plus `localhost`/`127.0.0.1`) and persists to `DATA_DIR` so restarts don't
-force a fresh browser click-through. `PUBLIC_URL` must then point at that `https://host:TLS_PORT` address —
-`getRedirectUri()` in `twitchOAuth.ts` uses `PUBLIC_URL` verbatim over the incoming request's own
-protocol/host specifically so the OAuth redirect URI can point at the TLS port while the WebUI itself keeps
-being served over plain HTTP on the main `PORT` day-to-day. The browser shows one untrusted-certificate
-warning to click through per cert (not per session) since it's self-signed, not CA-issued.
+### Zero-config: the container takes no variables (matches SweevElements)
+Only ports and the `/app/data` path. The WebUI password is created on first visit (`POST /api/auth/setup`,
+409 once a password exists; `/api/auth/me` returns `needsSetup`). The session/encryption secret is generated
+into `DATA_DIR/.session-secret` (`config/env.ts`); a legacy `SESSION_SECRET` env var still wins and is copied to
+that file, so removing it later keeps stored Twitch credentials readable. `TRUST_PROXY` is hardcoded to trust
+X-Forwarded-* only from private/loopback peers (Cloudflare Tunnel, LAN proxy). The removed `TLS_PORT`,
+`PUBLIC_URL`, `PUBLIC_PORT`, `WEBUI_PASSWORD` and the self-signed cert listener are gone on purpose: Twitch needs an
+HTTPS redirect URI, so the user registers `https://<their-domain>/twitch/callback` (Cloudflare Tunnel) and clicks
+Connect from that address; `getRedirectUri()` in `twitchOAuth.ts` derives it from the request (`req.protocol` +
+Host, honouring X-Forwarded-Proto from the trusted proxy). Admin and public page share one port/domain; allow
+`/public/quotes*` through any Cloudflare Access policy.
 
 ### The bot has no manual start/stop
 `server/src/twitch/chatClient.ts` auto-connects whenever authorized + a channel is configured — triggered
@@ -166,7 +164,7 @@ columns — everything from Twitch tokens to the WebUI password hash lives there
 `server/src/auth/session.ts` deliberately omits `cookie-session`'s `secure` option. The underlying `cookies`
 package then auto-detects it per-request from `req.protocol` (which respects `X-Forwarded-Proto`, since
 `app.ts` sets `trust proxy`) — so it's `secure` when reached over real or self-signed HTTPS and not-secure
-over plain HTTP, correct in all three deployment shapes (direct HTTP, the bundled `TLS_PORT` listener, and a
+over plain HTTP, correct in both deployment shapes (direct HTTP and a
 reverse proxy). A previous version hardcoded `secure: NODE_ENV === "production"`, which broke every
 plain-HTTP deployment (the common self-hosted case, e.g. Unraid reached directly by LAN IP): `cookies.set()`
 throws `"Cannot send secure cookie over unencrypted connection"` when `secure:true` is forced but the
@@ -233,8 +231,7 @@ Added 2026-11-18. **API key:** `services/integrationService.ts` (`integration_ap
 **Standalone page:** `routes/publicQuotes.ts` + `services/publicQuotesPage.ts` serve `/public/quotes` and
 `/public/quotes/:id` (`/quotes` is the admin SPA route), server-rendered in Quotation's own look (inlined
 tokens, `color-scheme: dark`), strict CSP with no scripts, off by default (setting `public_page_enabled`),
-identical 404 when off. Optional env `PUBLIC_PORT` starts a second Express app (`createPublicApp()` in
-`app.ts`) that serves ONLY that page, so one port can be exposed without the admin login. The SPA fallback
+identical 404 when off. The SPA fallback
 regex excludes `/public`.
 
 **Settings UI:** `web/src/components/IntegrationPanel.tsx`; endpoints `GET/PUT /api/settings/integration`,

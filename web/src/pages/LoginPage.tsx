@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useAuth } from "../context/AuthContext.js";
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, setup, needsSetup } = useAuth();
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -12,7 +12,7 @@ export default function LoginPage() {
     setError(null);
     setBusy(true);
     try {
-      await login(password);
+      await (needsSetup ? setup(password) : login(password));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't log in");
     } finally {
@@ -29,8 +29,10 @@ export default function LoginPage() {
             <div className="brand-mark">Q</div>
             <span className="brand-text">Quotation</span>
           </div>
-          <h1>Sign in</h1>
-          <p className="hint">Enter your WebUI password to manage the bot.</p>
+          <h1>{needsSetup ? "Create your password" : "Sign in"}</h1>
+          <p className="hint">
+            {needsSetup ? "Choose a password (at least 8 characters) to protect this WebUI." : "Enter your WebUI password to manage the bot."}
+          </p>
           <form className="stack" onSubmit={handleSubmit} style={{ marginTop: 16 }}>
             <div>
               <label className="label" htmlFor="password">
@@ -43,7 +45,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoFocus
-                autoComplete="current-password"
+                autoComplete={needsSetup ? "new-password" : "current-password"}
               />
             </div>
             {error && <p className="error-text">{error}</p>}

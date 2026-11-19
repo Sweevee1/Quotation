@@ -6,7 +6,6 @@ interface IntegrationState {
   hasApiKey: boolean;
   publicPageEnabled: boolean;
   publicPath: string;
-  publicPort: number | null;
 }
 
 /**
@@ -38,11 +37,7 @@ export default function IntegrationPanel() {
     }
   }
 
-  const publicUrl = state
-    ? state.publicPort
-      ? `${window.location.protocol}//${window.location.hostname}:${state.publicPort}${state.publicPath}`
-      : `${window.location.origin}${state.publicPath}`
-    : "";
+  const publicUrl = state ? `${window.location.origin}${state.publicPath}` : "";
 
   async function copy(text: string) {
     try {
@@ -172,9 +167,6 @@ export default function IntegrationPanel() {
               </label>
               <p className="hint">
                 Shows quote number, text, author, game and date. It never shows who added a quote.
-                {state.publicPort
-                  ? ` It is also served on its own port (${state.publicPort}), so you can expose only that port.`
-                  : " Set the PUBLIC_PORT environment variable to serve it on a separate port, so the admin login never has to be exposed."}
               </p>
               {state.publicPageEnabled && (
                 <p className="hint">

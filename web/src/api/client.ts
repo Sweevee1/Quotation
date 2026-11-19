@@ -63,7 +63,9 @@ export const api = {
       body: JSON.stringify({ password }),
     }),
   logout: () => request<{ authed: boolean }>("/api/auth/logout", { method: "POST" }),
-  me: () => request<{ authed: boolean }>("/api/auth/me"),
+  me: () => request<{ authed: boolean; needsSetup: boolean }>("/api/auth/me"),
+  setup: (password: string) =>
+    request<{ authed: boolean }>("/api/auth/setup", { method: "POST", body: JSON.stringify({ password }) }),
   changePassword: (currentPassword: string, newPassword: string) =>
     request<{ ok: boolean }>("/api/auth/change-password", {
       method: "POST",
@@ -95,7 +97,7 @@ export const api = {
   getTwitchAuthStatus: () => request<{ authorized: boolean }>("/api/settings/twitch/auth-status"),
 
   getIntegration: () =>
-    request<{ hasApiKey: boolean; publicPageEnabled: boolean; publicPath: string; publicPort: number | null }>(
+    request<{ hasApiKey: boolean; publicPageEnabled: boolean; publicPath: string }>(
       "/api/settings/integration",
     ),
   setPublicPageEnabled: (publicPageEnabled: boolean) =>

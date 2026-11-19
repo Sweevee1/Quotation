@@ -4,23 +4,9 @@ services:
     image: quotation-bot
     container_name: quotation-bot
     ports:
-      # Bound to localhost by default. For LAN access use "8766:8766" instead.
+      # Loopback only. For LAN access use "8766:8766". Never forward this port on your router;
+      # publish it through a Cloudflare Tunnel instead.
       - "127.0.0.1:8766:8766"
-      # Uncomment along with TLS_PORT below if you have no reverse-proxy TLS termination and
-      # need Twitch OAuth to work — see README's "HTTPS for Twitch OAuth" section.
-      # - "127.0.0.1:8767:8767"
-      # Public quotes page only (no admin login): uncomment with PUBLIC_PORT below.
-      # ONLY this port should ever be tunnelled/forwarded to the internet; 8766/8767 (admin) must never be.
-      # - "8768:8768"
     volumes:
       - ./data:/app/data
-    env_file:
-      - .env
-    environment:
-      - PORT=8766
-      - DATA_DIR=/app/data
-      - NODE_ENV=production
-      # - TLS_PORT=8767
-      # - PUBLIC_URL=https://your-server-address:8767
-      # - PUBLIC_PORT=8768
     restart: unless-stopped

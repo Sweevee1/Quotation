@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { z } from "zod";
-import { env } from "../config/env.js";
 import {
   hasApiKey,
   isPublicPageEnabled,
@@ -122,7 +121,6 @@ settingsRouter.get(
       hasApiKey: await hasApiKey(),
       publicPageEnabled: await isPublicPageEnabled(),
       publicPath: "/public/quotes",
-      publicPort: env.PUBLIC_PORT ?? null,
     });
   }),
 );

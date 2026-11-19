@@ -1,6 +1,5 @@
 import { randomBytes } from "node:crypto";
 import { Router, type Request, type Response } from "express";
-import { env } from "../config/env.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { logger } from "../logger.js";
 import {
@@ -17,7 +16,7 @@ import { esc } from "../services/publicQuotesPage.js";
 export const twitchOAuthRouter = Router();
 
 function getRedirectUri(req: Request): string {
-  const base = env.PUBLIC_URL ?? `${req.protocol}://${req.get("host")}`;
+  const base = `${req.protocol}://${req.get("host")}`;
   return `${base}/twitch/callback`;
 }
 

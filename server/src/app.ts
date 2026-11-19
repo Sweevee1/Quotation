@@ -26,30 +26,6 @@ function requestLogger(req: Request, res: Response, next: NextFunction): void {
   next();
 }
 
-/**
- * A second, minimal app that serves ONLY the public quotes page. Started on PUBLIC_PORT so
- * that one port can be forwarded/tunnelled without exposing the admin login or API.
- */
-export function createPublicApp(): express.Express {
-  const app = express();
-  app.set("trust proxy", env.TRUST_PROXY);
-  app.disable("x-powered-by");
-  app.use(requestLogger);
-  app.use(publicQuotesRouter);
-  app.use((_req, res) => {
-    res.status(404).set("Cache-Control", "no-store").type("text/plain").send("Not found");
-  });
-  app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
-    if (res.headersSent) {
-      next(err);
-      return;
-    }
-    logger.error({ err, method: req.method, url: req.path }, "Unhandled request error");
-    res.status(500).set("Cache-Control", "no-store").type("text/plain").send("Internal server error");
-  });
-  return app;
-}
-
 export function createApp(): express.Express {
   const app = express();
 
