@@ -22,7 +22,8 @@ COPY package.json package-lock.json* ./
 COPY shared/package.json shared/package.json
 COPY server/package.json server/package.json
 COPY web/package.json web/package.json
-RUN apt-get update && apt-get install -y --no-install-recommends gosu \n && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends gosu \
+ && rm -rf /var/lib/apt/lists/*
 RUN npm ci --omit=dev --ignore-scripts --workspace=@quotation/shared --workspace=@quotation/server
 
 COPY --from=build /app/shared/dist shared/dist
