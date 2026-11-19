@@ -2,9 +2,7 @@ import { eq } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { commandSettings, settings } from "../db/schema.js";
 import type { CommandConfig, CommandName } from "@quotation/shared";
-import { hashPassword } from "../auth/password.js";
 import { decryptSecret, encryptSecret, isEncrypted } from "../auth/secretBox.js";
-import { env } from "../config/env.js";
 import { logger } from "../logger.js";
 
 function rowToCommandConfig(row: typeof commandSettings.$inferSelect): CommandConfig {
@@ -135,20 +133,8 @@ export async function deleteSetting(key: string): Promise<void> {
   await db.delete(settings).where(eq(settings.key, key)).run();
 }
 
-/** Seeds first-run defaults: WebUI password hash and per-command config rows. */
+/** Seeds first-run defaults: per-command config rows. (The WebUI password is created in the WebUI.) */
 export async function ensureBootstrap(): Promise<void> {
-  if (!(await getSetting("webui_password_hash"))) {
-    // Only the first-run seed is checked, so existing installs with a shorter password still boot.
-    if (env.NODE_ENV === "production" && env.WEBUI_PASSWORD.length < 12) {
-      throw new Error("Refusing to seed: WEBUI_PASSWORD must be at least 12 characters in production.");
-    }
-    const hash = await hashPassword(env.WEBUI_PASSWORD);
-    await setSetting("webui_password_hash", hash);
-    logger.info(
-      "Seeded WebUI password from WEBUI_PASSWORD env var — change it from the Settings page.",
-    );
-  }
-
   for (const [commandName, defaults] of Object.entries(DEFAULT_COMMANDS) as [
     CommandName,
     (typeof DEFAULT_COMMANDS)[CommandName],

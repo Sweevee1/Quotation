@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { loginSchema, passwordChangeSchema } from "@quotation/shared";
+import { loginSchema, passwordChangeSchema, setupSchema } from "@quotation/shared";
 import { hashPassword, verifyPassword } from "../auth/password.js";
 import { bumpSessionEpoch, isSessionValid, requireAuth, sessionToken } from "../middleware/requireAuth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
@@ -32,6 +32,28 @@ authRouter.post(
   }),
 );
 
+// First run: no password exists yet, so the first visitor creates it (same as SweevElements).
+// Refuses once a password is set, so it can't be used to overwrite one.
+authRouter.post(
+  "/setup",
+  authLimiter,
+  asyncHandler(async (req, res) => {
+    if (await getSetting("webui_password_hash")) {
+      res.status(409).json({ error: "A password is already set" });
+      return;
+    }
+    const parsed = setupSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
+      return;
+    }
+    const hash = await hashPassword(parsed.data.password);
+    await setSetting("webui_password_hash", hash);
+    req.session = { authed: true, pw: await sessionToken(hash) };
+    res.json({ authed: true });
+  }),
+);
+
 authRouter.post(
   "/logout",
   asyncHandler(async (req, res) => {
@@ -46,7 +68,7 @@ authRouter.post(
 authRouter.get(
   "/me",
   asyncHandler(async (req, res) => {
-    res.json({ authed: await isSessionValid(req) });
+    res.json({ authed: await isSessionValid(req), needsSetup: !(await getSetting("webui_password_hash")) });
   }),
 );
 

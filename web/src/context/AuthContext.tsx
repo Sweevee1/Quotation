@@ -3,6 +3,8 @@ import { api } from "../api/client.js";
 
 interface AuthContextValue {
   authed: boolean | null;
+  needsSetup: boolean;
+  setup: (password: string) => Promise<void>;
   login: (password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -11,11 +13,15 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [authed, setAuthed] = useState<boolean | null>(null);
+  const [needsSetup, setNeedsSetup] = useState(false);
 
   useEffect(() => {
     api
       .me()
-      .then((r) => setAuthed(r.authed))
+      .then((r) => {
+        setNeedsSetup(r.needsSetup);
+        setAuthed(r.authed);
+      })
       .catch(() => setAuthed(false));
   }, []);
 
@@ -24,12 +30,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthed(true);
   }, []);
 
+  const setup = useCallback(async (password: string) => {
+    await api.setup(password);
+    setNeedsSetup(false);
+    setAuthed(true);
+  }, []);
+
   const logout = useCallback(async () => {
     await api.logout();
     setAuthed(false);
   }, []);
 
-  return <AuthContext.Provider value={{ authed, login, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ authed, needsSetup, setup, login, logout }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthContextValue {
