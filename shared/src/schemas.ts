@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { COMMAND_NAMES, ROLES } from "./types.js";
 
-export const roleSchema = z.enum(ROLES);
-export const commandNameSchema = z.enum(COMMAND_NAMES);
+export const roleSchema = z.enum([...ROLES]);
+export const commandNameSchema = z.enum([...COMMAND_NAMES]);
 
 export const loginSchema = z.object({
   password: z.string().min(1),

@@ -1,4 +1,5 @@
-import { Router, type Request } from "express";
+import { randomBytes } from "node:crypto";
+import { Router, type Request, type Response } from "express";
 import { env } from "../config/env.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { logger } from "../logger.js";
@@ -11,6 +12,7 @@ import {
 import { publishEvent } from "../events/bus.js";
 import { connectBot } from "../twitch/chatClient.js";
 import { getSetting } from "../services/settingsService.js";
+import { esc } from "../services/publicQuotesPage.js";
 
 export const twitchOAuthRouter = Router();
 
@@ -19,14 +21,23 @@ function getRedirectUri(req: Request): string {
   return `${base}/twitch/callback`;
 }
 
-function popupPage(message: string, ok: boolean): string {
-  return `<!doctype html><html><body style="font-family: sans-serif; padding: 2rem;">
-<p>${ok ? "Authorised" : "Authorisation failed"} — ${message}</p>
-<script>
-  if (window.opener) { try { window.opener.postMessage("twitch-oauth-${ok ? "success" : "error"}", "*"); } catch (e) {} }
+function sendPopup(res: Response, status: number, message: string, ok: boolean): void {
+  const nonce = randomBytes(16).toString("base64");
+  res
+    .status(status)
+    .set({
+      "Content-Security-Policy": `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; base-uri 'none'; frame-ancestors 'none'`,
+      "X-Content-Type-Options": "nosniff",
+      "Cache-Control": "no-store",
+    })
+    .type("html")
+    .send(`<!doctype html><html><head><style nonce="${nonce}">body{font-family:sans-serif;padding:2rem}</style></head><body>
+<p>${ok ? "Authorised" : "Authorisation failed"} — ${esc(message)}</p>
+<script nonce="${nonce}">
+  if (window.opener) { try { window.opener.postMessage("twitch-oauth-${ok ? "success" : "error"}", window.location.origin); } catch (e) {} }
   setTimeout(() => window.close(), ${ok ? 1200 : 4000});
 </script>
-</body></html>`;
+</body></html>`);
 }
 
 // Kicks off the flow: builds and returns the Twitch authorize URL for the popup to navigate to.
@@ -53,12 +64,12 @@ twitchOAuthRouter.get("/twitch/callback", async (req, res) => {
 
   if (error) {
     logger.warn({ error, error_description }, "Twitch OAuth denied/errored");
-    res.status(400).send(popupPage(error_description || error, false));
+    sendPopup(res, 400, error_description || error, false);
     return;
   }
 
   if (!code || !state || !consumeOAuthState(state)) {
-    res.status(400).send(popupPage("invalid or expired authorization state", false));
+    sendPopup(res, 400, "invalid or expired authorization state", false);
     return;
   }
 
@@ -66,7 +77,7 @@ twitchOAuthRouter.get("/twitch/callback", async (req, res) => {
     const redirectUri = getRedirectUri(req);
     const user = await completeAuthorizationCodeFlow(code, redirectUri);
     publishEvent("status", `Twitch bot account authorized as ${user.display_name}`);
-    res.send(popupPage(`connected as ${user.display_name} — closing…`, true));
+    sendPopup(res, 200, `connected as ${user.display_name} — closing…`, true);
 
     // Bot should always be running once authorized+configured — no manual start needed.
     if (await getSetting("twitch_channel")) {
@@ -74,6 +85,6 @@ twitchOAuthRouter.get("/twitch/callback", async (req, res) => {
     }
   } catch (err) {
     logger.error({ err }, "Twitch OAuth callback failed");
-    res.status(500).send(popupPage("check server logs for details", false));
+    sendPopup(res, 500, "check server logs for details", false);
   }
 });

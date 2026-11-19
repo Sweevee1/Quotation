@@ -77,7 +77,7 @@ export default function DashboardPage() {
       const { authUrl } = await api.startTwitchOAuth();
       const popup = window.open(authUrl, "twitch-oauth", "width=480,height=720");
       const onMessage = (e: MessageEvent) => {
-        if (typeof e.data === "string" && e.data.startsWith("twitch-oauth-")) {
+        if (e.origin === window.location.origin && typeof e.data === "string" && e.data.startsWith("twitch-oauth-")) {
           window.removeEventListener("message", onMessage);
           refresh();
           setOauthBusy(false);

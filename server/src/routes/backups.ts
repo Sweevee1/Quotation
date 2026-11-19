@@ -32,6 +32,11 @@ backupsRouter.post(
       res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid import payload" });
       return;
     }
+    const ids = parsed.data.quotes.flatMap((q) => (q.id !== undefined ? [q.id] : []));
+    if (new Set(ids).size !== ids.length) {
+      res.status(400).json({ error: "Import contains duplicate quote ids" });
+      return;
+    }
     const backup = await importBackup(parsed.data.quotes);
     publishEvent("status", `Backup imported from file (${backup.quoteCount} quotes)`);
     res.status(201).json(backup);
@@ -70,7 +75,8 @@ backupsRouter.post(
       publishEvent("status", `Restored backup #${id} (${result.restoredCount} quotes)`);
       res.json(result);
     } catch (err) {
-      res.status(404).json({ error: err instanceof Error ? err.message : "Restore failed" });
+      const notFound = err instanceof Error && err.message === "Backup not found";
+      res.status(notFound ? 404 : 500).json({ error: notFound ? "Backup not found" : "Restore failed" });
     }
   }),
 );

@@ -16,7 +16,7 @@ const envSchema = z.object({
    * used to build the Twitch OAuth redirect URI. If unset, it's auto-detected from the
    * incoming request's protocol/host (respecting X-Forwarded-Proto behind a reverse proxy).
    */
-  PUBLIC_URL: z.string().url().optional(),
+  PUBLIC_URL: z.url().optional(),
   /**
    * Optional port for a bundled self-signed HTTPS listener, serving the same app as PORT.
    * Twitch requires the OAuth redirect URI to be HTTPS for anything but literal "localhost" —
@@ -34,6 +34,20 @@ const envSchema = z.object({
    */
   PUBLIC_PORT: z.coerce.number().int().min(1).max(65535).optional(),
   TLS_PORT: z.coerce.number().int().min(1).max(65535).optional(),
+  /** Number of reverse-proxy hops to trust for X-Forwarded-* (client IP, protocol). Set 0 if directly exposed. */
+  TRUST_PROXY: z.coerce.number().int().min(0).max(10).default(1),
 });
 
 export const env = envSchema.parse(process.env);
+
+if (env.NODE_ENV === "production") {
+  const weakSecrets = ["dev-only-insecure-secret", "change-me-too", "change-me"];
+  if (weakSecrets.includes(env.SESSION_SECRET) || env.SESSION_SECRET.length < 32) {
+    console.error("Refusing to start: set SESSION_SECRET to a random value of at least 32 characters.");
+    process.exit(1);
+  }
+  if (env.WEBUI_PASSWORD === "change-me") {
+    console.error('Refusing to start: WEBUI_PASSWORD is still the default "change-me".');
+    process.exit(1);
+  }
+}

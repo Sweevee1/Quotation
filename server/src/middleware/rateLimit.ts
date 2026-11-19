@@ -13,6 +13,7 @@ export function rateLimit(bucket: string, max: number, windowMs = 60_000) {
     const recent = (hits.get(key) ?? []).filter((t) => now - t < windowMs);
     if (recent.length >= max) {
       res.setHeader("Retry-After", String(Math.ceil(windowMs / 1000)));
+      res.setHeader("Cache-Control", "no-store");
       res.status(429).json({ error: "Too many requests" });
       return;
     }
