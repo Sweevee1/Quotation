@@ -35,9 +35,13 @@ function send(res: Response, status: number, html: (nonce: string) => string): v
     .set({
       "Content-Type": "text/html; charset=utf-8",
       "Content-Security-Policy": cspHeader(nonce),
-      "Cache-Control": status === 200 ? "public, max-age=30" : "no-store",
+      // no-store (was public, max-age=30): a shared cache would reuse one CSP nonce for every visitor and keep
+      // serving the page for up to 30 s after the owner switches it off. The page is rate limited and cheap.
+      "Cache-Control": "no-store",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "no-referrer",
+      "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
+      "Cross-Origin-Opener-Policy": "same-origin",
     })
     .send(html(nonce));
 }
