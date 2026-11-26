@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client.js";
+import { copyText } from "../clipboard.js";
 import { IconChevronDown } from "../icons.js";
 
 interface IntegrationState {
@@ -40,11 +41,11 @@ export default function IntegrationPanel() {
   const publicUrl = state ? `${window.location.origin}${state.publicPath}` : "";
 
   async function copy(text: string) {
-    try {
-      await navigator.clipboard.writeText(text);
+    if (await copyText(text)) {
+      setError(null);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch {
+    } else {
       setError("Copy failed. Select the key and copy it manually.");
     }
   }
