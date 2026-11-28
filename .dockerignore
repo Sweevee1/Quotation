@@ -25,6 +25,7 @@ node_modules
 .impeccable
 AGENTS.md
 CLAUDE.md
+private-docs
 README.md
 docs
 docker-compose.yml
